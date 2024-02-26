@@ -84,6 +84,7 @@ all_datasets = {
 
 
 def get_dataset(dataset, root="./"):
+    print(dataset)
     return all_datasets[dataset](root)
 
 
