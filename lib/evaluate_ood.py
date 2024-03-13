@@ -97,4 +97,8 @@ def get_auroc_classification(data, model, likelihood=None):
     accuracy = np.mean(accuracies)
     roc_auc = roc_auc_score(1 - accuracies, scores)
 
-    return accuracy, roc_auc
+    precision, recall, _ = precision_recall_curve(accuracies, scores)
+    aupr = auc(recall, precision)
+
+
+    return accuracy, roc_auc, aupr

@@ -17,8 +17,8 @@ from due.wide_resnet import WideResNet
 from due.sngp import Laplace
 
 from lib.datasets import get_dataset
-from lib.evaluate_ood import get_ood_metrics
-from lib.metrics import ECE
+from lib.evaluate_ood import get_ood_metrics, get_auroc_classification
+from lib.metrics import BrierScore, ECE 
 from lib.utils import get_results_directory, Hyperparameters, set_seed
 
 # For context see: https://github.com/pytorch/pytorch/issues/47908
@@ -175,6 +175,9 @@ def main(hparams):
     metric = ECE(output_transform=output_transform)
     metric.attach(evaluator, "ece")
 
+    metric = BrierScore(output_transform=output_transform)
+    metric.attach(evaluator, "brier")
+
     kwargs = {"num_workers": 4, "pin_memory": True}
 
     train_loader = torch.utils.data.DataLoader(
@@ -245,7 +248,7 @@ def main(hparams):
     pbar.attach(trainer)
 
     # trainer.run(train_loader, max_epochs=200)
-    model.load_state_dict(torch.load("runs/default/2024-02-24-Saturday-00-21-50/model.pt"))
+    model.load_state_dict(torch.load("runs/default/2024-03-10-Sunday-01-17-53/model.pt"))
 
     # Done training - time to evaluate
     results = {}
@@ -254,9 +257,22 @@ def main(hparams):
     test_acc = evaluator.state.metrics["accuracy"]
     test_loss = evaluator.state.metrics["loss"]
     test_ece = evaluator.state.metrics["ece"]
+    test_brier = evaluator.state.metrics["brier"]
     results["test_accuracy"] = test_acc
     results["test_loss"] = test_loss
     results["test_ece"] = test_ece
+    results["test_brier"] = test_brier
+
+    _, auroc, aupr = get_auroc_classification(test_dataset, model, likelihood)
+    results["auroc"] = auroc
+    results["aupr"] = aupr
+
+    _, auroc, aupr = get_ood_metrics(
+        hparams.dataset, "CIFAR100", model, likelihood, hparams.data_root
+    )
+
+    results["auroc_ood_cifar100"] = auroc
+    results["aupr_ood_cifar100"] = aupr
 
     _, auroc, aupr = get_ood_metrics(
         hparams.dataset, "SVHN", model, likelihood, hparams.data_root

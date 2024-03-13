@@ -78,3 +78,45 @@ class ECE(Metric):
         if self._num_examples == 0:
             raise NotComputableError('CustomAccuracy must have at least one example before it can be computed.')
         return self._sum.item() / self._num_examples
+
+
+class BrierScore(Metric):
+    """
+    Brier score for Categorical predictions.
+    """
+
+    norm_sum: torch.Tensor
+    norm_count: torch.Tensor
+
+    def __init__(
+        self,
+        output_transform = lambda x: x,
+        batch_size = len,
+        device = torch.device("cuda:0"),
+    ):
+        super(BrierScore, self).__init__(output_transform, device=device)
+        self._batch_size = batch_size
+
+    @reinit__is_reduced
+    def reset(self):
+        self._sum = torch.tensor(0.0, device=self._device)
+        self._num_examples = 0
+
+    @reinit__is_reduced
+    def update(self, output):
+        y_pred, y = output[0].detach(), output[1].detach()
+
+        num_items = y_pred.size(0)
+        prob = y_pred.clone()
+        indices = torch.arange(num_items)
+        prob[indices, y] -= 1
+        norm = prob.norm(dim=-1)
+
+        self._sum += norm.sum()
+        self._num_examples += num_items
+
+    @sync_all_reduce("_num_examples", "_num_correct:SUM")
+    def compute(self):
+        if self._num_examples == 0:
+            raise NotComputableError('CustomAccuracy must have at least one example before it can be computed.')
+        return self._sum.item() / self._num_examples
